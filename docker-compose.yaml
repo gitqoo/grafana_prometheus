@@ -1,0 +1,57 @@
+version: '3'
+
+services:
+  prometheus:
+    image: ubuntu/prometheus
+    container_name: prometheus
+    volumes:
+      - /mnt/nfs_mount/prometheus/data:/prometheus/data
+      - /mnt/nfs_mount/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - /root/rules:/etc/prometheus/rules
+    command: '--config.file=/etc/prometheus/prometheus.yml'
+    ports:
+      - "5480:9090"
+
+  grafana:
+    image: grafana/grafana:8.2.5
+    container_name: grafana
+    environment:
+      - GF_RENDERING_SERVER_URL=http://renderer:8081/render
+      - GF_RENDERING_CALLBACK_URL=http://grafana:3000/
+      - GF_LOG_FILTERS=rendering:debug    
+    volumes:
+      - /mnt/nfs_mount/grafana:/var/lib/grafana
+      #- /root/grafana.ini:/etc/grafana/grafana.ini
+    ports:
+      - "6443:3000"
+    depends_on:
+      - renderer
+
+  renderer:
+    container_name: renderer
+    image: grafana/grafana-image-renderer:3.2.1
+    ports:
+      - "8081:8081"
+
+  alertmanager:
+    image: prom/alertmanager:v0.24.0
+    container_name: 'alertmanager'
+    ports:
+      - 9093:9093
+    volumes:
+      - /root/alertmanager.yaml:/etc/alertmanager/alertmanager.yaml
+      - /root/template.tmpl:/etc/alertmanager/template.tmpl
+    restart: always
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yaml'
+      - '--storage.path=/alertmanager'
+
+  node-exporter:
+    image: prom/node-exporter:v1.2.2
+    container_name: node-exporter
+    ports:
+      - "30001:9100"
+    volumes:
+      - "/proc:/host/proc:ro"
+      - "/sys:/host/sys:ro"
+      - "/:/rootfs:ro"
